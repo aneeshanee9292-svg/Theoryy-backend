@@ -89,10 +89,13 @@ public class PaymentServiceImpl implements PaymentService {
 		            order.setStatus(OrderStatus.ORDER_PLACED);
 		            orderRepository.save(order);
 		            
-		         // 🔥 SEND EMAIL
+		         // 🔥 SEND EMAIL TO CUSTOMER
 		            if (order.getEmail() != null) {
 		                emailService.sendInvoice(order.getEmail(), order);
 		            }
+
+		            // 📧 SEND EMAIL TO ADMIN
+		            emailService.sendAdminOrderNotification(order);
 
 		            return "Payment verified, stock updated, order placed";
 		        } else {
