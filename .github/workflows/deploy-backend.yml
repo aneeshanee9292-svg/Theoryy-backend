@@ -3,10 +3,6 @@ name: Deploy Backend
 on:
   push:
     branches: [main]
-    paths:
-      - 'src/**'
-      - 'pom.xml'
-      - '.github/workflows/deploy-backend.yml'
 
 jobs:
   build-and-deploy:
