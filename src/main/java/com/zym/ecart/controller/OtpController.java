@@ -1,7 +1,6 @@
 package com.zym.ecart.controller;
 
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -12,7 +11,6 @@ import com.zym.ecart.service.impl.OtpServiceImpl;
 
 @RestController
 @RequestMapping("/otp")
-@CrossOrigin
 public class OtpController {
 
     // Inject the implementation directly (not interface) to access generateAndSendEmailOtp

@@ -7,7 +7,6 @@ import java.nio.file.Files;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -19,9 +18,10 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.zym.ecart.dto.ApiResponse;
 
+import jakarta.servlet.http.HttpServletRequest;
+
 @RestController
 @RequestMapping("/files")
-@CrossOrigin
 public class FileController {
 
     @Value("${file.upload-dir}")
@@ -30,10 +30,20 @@ public class FileController {
     // Allowed folders
     private static final List<String> ALLOWED_FOLDERS = List.of("products", "banners", "profile");
 
+    private String getBaseUrl(HttpServletRequest request) {
+        String scheme = request.getScheme();
+        String host = request.getServerName();
+        int port = request.getServerPort();
+        if ((scheme.equals("http") && port == 80) || (scheme.equals("https") && port == 443))
+            return scheme + "://" + host;
+        return scheme + "://" + host + ":" + port;
+    }
+
     @PostMapping("/upload/{folder}")
     public ResponseEntity<ApiResponse<String>> uploadFile(
             @PathVariable String folder,
-            @RequestParam("file") MultipartFile file) {
+            @RequestParam("file") MultipartFile file,
+            HttpServletRequest request) {
 
         try {
             // Validate folder
@@ -55,8 +65,7 @@ public class FileController {
             Files.createDirectories(path.getParent());
             Files.write(path, file.getBytes());
 
-            // Build URL using /uploads/ path that WebConfig serves
-            String fileUrl = "http://localhost:8081/uploads/" + folder + "/" + fileName;
+            String fileUrl = getBaseUrl(request) + "/uploads/" + folder + "/" + fileName;
 
             return ResponseEntity.ok(new ApiResponse<>(true, "File uploaded", fileUrl));
 
@@ -68,7 +77,7 @@ public class FileController {
         
         
     @GetMapping("/list/{folder}")
-    public ResponseEntity<ApiResponse<List<String>>> listFiles(@PathVariable String folder) {
+    public ResponseEntity<ApiResponse<List<String>>> listFiles(@PathVariable String folder, HttpServletRequest request) {
         try {
             Path folderPath = Paths.get(uploadDir, folder);
 
@@ -77,10 +86,10 @@ public class FileController {
                         .body(new ApiResponse<>(false, "Folder not found", null));
             }
 
-            // Collect all file URLs using the /uploads/ path
+            String baseUrl = getBaseUrl(request);
             List<String> fileUrls = Files.list(folderPath)
                     .filter(Files::isRegularFile)
-                    .map(path -> "http://localhost:8081/uploads/" + folder + "/" + path.getFileName().toString())
+                    .map(path -> baseUrl + "/uploads/" + folder + "/" + path.getFileName().toString())
                     .toList();
 
             return ResponseEntity.ok(new ApiResponse<>(true, "Files listed", fileUrls));

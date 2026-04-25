@@ -1,9 +1,9 @@
 package com.zym.ecart.controller;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -12,25 +12,98 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.zym.ecart.dto.OrderItemDto;
+import com.zym.ecart.dto.OrderResponseDto;
+import com.zym.ecart.dto.ProductDto;
 import com.zym.ecart.entity.Coupon;
+import com.zym.ecart.entity.Order;
 import com.zym.ecart.entity.ProductDiscount;
+import com.zym.ecart.enums.OrderStatus;
 import com.zym.ecart.repository.CouponRepository;
+import com.zym.ecart.repository.OrderRepository;
 import com.zym.ecart.repository.ProductDiscountRepository;
 
 @RestController
 @RequestMapping("/admin")
-@CrossOrigin
 public class AdminController {
 
 	private final CouponRepository couponRepository;
 	private final ProductDiscountRepository productDiscountRepository;
+	private final OrderRepository orderRepository;
 
-	public AdminController(CouponRepository couponRepository, ProductDiscountRepository productDiscountRepository) {
-		super();
+	public AdminController(CouponRepository couponRepository,
+						   ProductDiscountRepository productDiscountRepository,
+						   OrderRepository orderRepository) {
 		this.couponRepository = couponRepository;
 		this.productDiscountRepository = productDiscountRepository;
+		this.orderRepository = orderRepository;
+	}
+
+	// ──────────────── ORDER MANAGEMENT ENDPOINTS ────────────────
+
+	@GetMapping("/orders")
+	public List<OrderResponseDto> getAllOrders() {
+		return orderRepository.findAll()
+				.stream()
+				.sorted((a, b) -> {
+					if (a.getCreatedAt() == null) return 1;
+					if (b.getCreatedAt() == null) return -1;
+					return b.getCreatedAt().compareTo(a.getCreatedAt());
+				})
+				.map(this::toOrderResponseDto)
+				.collect(Collectors.toList());
+	}
+
+	@PatchMapping("/orders/{id}/status")
+	public ResponseEntity<?> updateOrderStatus(@PathVariable Long id, @RequestParam String status) {
+		return orderRepository.findById(id).map(order -> {
+			order.setStatus(OrderStatus.valueOf(status));
+			orderRepository.save(order);
+			return ResponseEntity.ok(toOrderResponseDto(order));
+		}).orElse(ResponseEntity.notFound().build());
+	}
+
+	private OrderResponseDto toOrderResponseDto(Order order) {
+		List<OrderItemDto> itemDtos = order.getItems().stream()
+				.map(item -> {
+					ProductDto productDto = null;
+					if (item.getProduct() != null) {
+						productDto = ProductDto.builder()
+								.id(item.getProduct().getId())
+								.name(item.getProduct().getName())
+								.price(item.getProduct().getPrice())
+								.build();
+					}
+					return OrderItemDto.builder()
+							.id(item.getId())
+							.quantity(item.getQuantity())
+							.finalPrice(item.getFinalPrice())
+							.product(productDto)
+							.build();
+				})
+				.collect(Collectors.toList());
+
+		return OrderResponseDto.builder()
+				.id(order.getId())
+				.mobileNumber(order.getMobileNumber())
+				.email(order.getEmail())
+				.fullName(order.getFullName())
+				.address(order.getAddress())
+				.city(order.getCity())
+				.state(order.getState())
+				.pincode(order.getPincode())
+				.totalAmount(order.getTotalAmount())
+				.discountAmount(order.getDiscountAmount())
+				.finalAmount(order.getFinalAmount())
+				.couponCode(order.getCouponCode())
+				.status(order.getStatus() != null ? order.getStatus().name() : null)
+				.createdAt(order.getCreatedAt())
+				.razorpayOrderId(order.getRazorpayOrderId())
+				.items(itemDtos)
+				.build();
 	}
 
 	// ──────────────── COUPON ENDPOINTS ────────────────

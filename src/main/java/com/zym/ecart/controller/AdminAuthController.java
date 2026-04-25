@@ -17,7 +17,6 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/admin/auth")
-@CrossOrigin
 public class AdminAuthController {
 
     @Autowired
