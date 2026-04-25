@@ -57,6 +57,12 @@ public class FileController {
                 return ResponseEntity.badRequest()
                         .body(new ApiResponse<>(false, "File is empty", null));
             }
+            
+         // ✅ Validate file size
+            if (file.getSize() > 5 * 1024 * 1024) {
+                return ResponseEntity.badRequest()
+                        .body(new ApiResponse<>(false, "File size exceeds 5 MB limit", null));
+            }
 
             // Unique filename
             String fileName = System.currentTimeMillis() + "_" + file.getOriginalFilename();
