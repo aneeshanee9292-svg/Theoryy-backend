@@ -1,11 +1,7 @@
 package com.zym.ecart.controller;
 
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
-import java.nio.file.Files;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,158 +15,100 @@ import org.springframework.web.multipart.MultipartFile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
- 
 import com.zym.ecart.dto.ApiResponse;
-
-import jakarta.servlet.http.HttpServletRequest;
+import com.zym.ecart.service.S3StorageService;
 
 @RestController
 @RequestMapping("/files")
 public class FileController {
-	
-	private static final Logger logger = LoggerFactory.getLogger(FileController.class);
 
+    private static final Logger logger = LoggerFactory.getLogger(FileController.class);
 
-    @Value("${file.upload-dir}")
-    private String uploadDir;
+    private final S3StorageService s3StorageService;
 
-    // Allowed folders
-    private static final List<String> ALLOWED_FOLDERS = List.of("products", "banners", "profile");
-
-    private String getBaseUrl(HttpServletRequest request) {
-        String scheme = request.getScheme();
-        String host = request.getServerName();
-        int port = request.getServerPort();
-        if ((scheme.equals("http") && port == 80) || (scheme.equals("https") && port == 443))
-            return scheme + "://" + host;
-        return scheme + "://" + host + ":" + port;
+    public FileController(S3StorageService s3StorageService) {
+        this.s3StorageService = s3StorageService;
     }
 
-    @PostMapping("/upload/{folder}")
+    /**
+     * Upload an image to S3 gallery folder.
+     * POST /files/upload
+     */
+    @PostMapping("/upload")
     public ResponseEntity<ApiResponse<String>> uploadFile(
-            @PathVariable String folder,
-            @RequestParam("file") MultipartFile file,
-            HttpServletRequest request) {
-    	
+            @RequestParam("file") MultipartFile file) {
 
         try {
-        	 logger.info("Upload request received for folder: {}", folder);
+            logger.info("Upload request received: {}", file.getOriginalFilename());
 
-             // Validate folder
-             if (!ALLOWED_FOLDERS.contains(folder)) {
-                 return ResponseEntity.badRequest()
-                         .body(new ApiResponse<>(false, "Invalid folder name", null));
-             }
+            // Validate file
+            if (file.isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(new ApiResponse<>(false, "File is empty", null));
+            }
 
-             // Validate file
-             if (file.isEmpty()) {
-                 return ResponseEntity.badRequest()
-                         .body(new ApiResponse<>(false, "File is empty", null));
-             }
-
-             // Validate uploads directory
-             Path uploadsPath = Paths.get(uploadDir, folder);
-             if (!Files.exists(uploadsPath) || !Files.isDirectory(uploadsPath)) {
-                 return ResponseEntity.badRequest()
-                         .body(new ApiResponse<>(false, "Uploads directory not accessible", null));
-             }
-
-             // Check if directory is empty
-             boolean isEmpty = Files.list(uploadsPath).findAny().isEmpty();
-             if (isEmpty) {
-                 // ✅ Create test file if empty
-                 String testFileName = "test_" + System.currentTimeMillis() + ".txt";
-                 Path testFilePath = uploadsPath.resolve(testFileName);
-                 Files.createDirectories(testFilePath.getParent());
-                 Files.writeString(testFilePath, "This is a test file created automatically.");
-                 logger.info("Test file created: {}", testFilePath.toString());
-             } else {
-                 // ✅ Directory accessible and has files
-                 logger.info("Uploads directory accessible, existing files present in folder: {}", folder);
-             }
-        	
-         
-         // ✅ Validate file size
+            // Validate file size (5 MB max)
             if (file.getSize() > 5 * 1024 * 1024) {
                 return ResponseEntity.badRequest()
                         .body(new ApiResponse<>(false, "File size exceeds 5 MB limit", null));
             }
 
-            // Unique filename
-            String fileName = System.currentTimeMillis() + "_" + file.getOriginalFilename();
-            Path path = Paths.get(uploadDir, folder, fileName);
+            // Validate content type
+            String contentType = file.getContentType();
+            if (contentType == null || !contentType.startsWith("image/")) {
+                return ResponseEntity.badRequest()
+                        .body(new ApiResponse<>(false, "Only image files are allowed", null));
+            }
 
-            Files.createDirectories(path.getParent());
-            Files.write(path, file.getBytes());
-
-            String fileUrl = getBaseUrl(request) + "/uploads/" + folder + "/" + fileName;
+            String fileUrl = s3StorageService.uploadFile(file);
 
             return ResponseEntity.ok(new ApiResponse<>(true, "File uploaded", fileUrl));
 
         } catch (Exception e) {
+            logger.error("File upload failed", e);
             return ResponseEntity.internalServerError()
-                    .body(new ApiResponse<>(false, "File upload failed", null));
+                    .body(new ApiResponse<>(false, "File upload failed: " + e.getMessage(), null));
         }
     }
-        
-        
-    @GetMapping("/list/{folder}")
-    public ResponseEntity<ApiResponse<List<String>>> listFiles(@PathVariable String folder, HttpServletRequest request) {
+
+    /**
+     * List all images in the S3 gallery.
+     * GET /files/list
+     */
+    @GetMapping("/list")
+    public ResponseEntity<ApiResponse<List<String>>> listFiles() {
         try {
-            Path folderPath = Paths.get(uploadDir, folder);
-
-            if (!Files.exists(folderPath) || !Files.isDirectory(folderPath)) {
-                return ResponseEntity.badRequest()
-                        .body(new ApiResponse<>(false, "Folder not found", null));
-            }
-
-            String baseUrl = getBaseUrl(request);
-            List<String> fileUrls = Files.list(folderPath)
-                    .filter(Files::isRegularFile)
-                    .map(path -> baseUrl + "/uploads/" + folder + "/" + path.getFileName().toString())
-                    .toList();
-
+            List<String> fileUrls = s3StorageService.listFiles();
             return ResponseEntity.ok(new ApiResponse<>(true, "Files listed", fileUrls));
 
         } catch (Exception e) {
+            logger.error("Failed to list files", e);
             return ResponseEntity.internalServerError()
-                    .body(new ApiResponse<>(false, "Failed to list files", null));
+                    .body(new ApiResponse<>(false, "Failed to list files: " + e.getMessage(), null));
         }
     }
 
-    @DeleteMapping("/{folder}/{filename}")
-    public ResponseEntity<ApiResponse<String>> deleteFile(
-            @PathVariable String folder,
-            @PathVariable String filename) {
-
+    /**
+     * Delete an image from S3 gallery.
+     * DELETE /files/{filename}
+     */
+    @DeleteMapping("/{filename}")
+    public ResponseEntity<ApiResponse<String>> deleteFile(@PathVariable String filename) {
         try {
-            // Validate folder
-            if (!ALLOWED_FOLDERS.contains(folder)) {
-                return ResponseEntity.badRequest()
-                        .body(new ApiResponse<>(false, "Invalid folder name", null));
-            }
-
-            // Sanitize filename to prevent path traversal
+            // Sanitize filename
             if (filename.contains("..") || filename.contains("/") || filename.contains("\\")) {
                 return ResponseEntity.badRequest()
                         .body(new ApiResponse<>(false, "Invalid filename", null));
             }
 
-            Path filePath = Paths.get(uploadDir, folder, filename);
-
-            if (!Files.exists(filePath)) {
-                return ResponseEntity.badRequest()
-                        .body(new ApiResponse<>(false, "File not found", null));
-            }
-
-            Files.delete(filePath);
+            s3StorageService.deleteFile(filename);
 
             return ResponseEntity.ok(new ApiResponse<>(true, "File deleted", filename));
 
         } catch (Exception e) {
+            logger.error("Failed to delete file", e);
             return ResponseEntity.internalServerError()
                     .body(new ApiResponse<>(false, "Failed to delete file: " + e.getMessage(), null));
         }
     }
-
 }

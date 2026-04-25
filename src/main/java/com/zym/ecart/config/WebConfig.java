@@ -1,16 +1,11 @@
 package com.zym.ecart.config;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
-import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
-
-    @Value("${file.upload-dir}")
-    private String uploadDir;
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
@@ -21,11 +16,5 @@ public class WebConfig implements WebMvcConfigurer {
                 .allowCredentials(true);
     }
 
-    @Override
-    public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        // Serve files from the uploads directory at /uploads/**
-        // e.g. http://localhost:8081/uploads/products/filename.png
-        registry.addResourceHandler("/uploads/**")
-                .addResourceLocations("file:" + uploadDir + "/");
-    }
+    // Local file serving removed — images are now served directly from S3
 }
