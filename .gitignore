@@ -1,1 +1,3 @@
 src/main/resources/application-prod.properties
+target/
+*.jar
