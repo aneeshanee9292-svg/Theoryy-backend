@@ -8,12 +8,9 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        working-directory: .
-
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -22,7 +19,7 @@ jobs:
           distribution: 'corretto'
 
       - name: Build JAR
-        run: ./mvnw clean package -DskipTests
+        run: mvn clean package -DskipTests
 
       - name: Copy JAR to EC2
         uses: appleboy/scp-action@v0.1.7
@@ -43,3 +40,5 @@ jobs:
             cd /opt/zym-app
             mv *.jar app.jar
             sudo systemctl restart zym-app
+            sleep 5
+            sudo systemctl status zym-app
