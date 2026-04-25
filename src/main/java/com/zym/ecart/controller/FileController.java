@@ -16,6 +16,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+ 
 import com.zym.ecart.dto.ApiResponse;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,6 +27,9 @@ import jakarta.servlet.http.HttpServletRequest;
 @RestController
 @RequestMapping("/files")
 public class FileController {
+	
+	private static final Logger logger = LoggerFactory.getLogger(FileController.class);
+
 
     @Value("${file.upload-dir}")
     private String uploadDir;
@@ -44,20 +51,45 @@ public class FileController {
             @PathVariable String folder,
             @RequestParam("file") MultipartFile file,
             HttpServletRequest request) {
+    	
 
         try {
-            // Validate folder
-            if (!ALLOWED_FOLDERS.contains(folder)) {
-                return ResponseEntity.badRequest()
-                        .body(new ApiResponse<>(false, "Invalid folder name", null));
-            }
+        	 logger.info("Upload request received for folder: {}", folder);
 
-            // Validate file
-            if (file.isEmpty()) {
-                return ResponseEntity.badRequest()
-                        .body(new ApiResponse<>(false, "File is empty", null));
-            }
-            
+             // Validate folder
+             if (!ALLOWED_FOLDERS.contains(folder)) {
+                 return ResponseEntity.badRequest()
+                         .body(new ApiResponse<>(false, "Invalid folder name", null));
+             }
+
+             // Validate file
+             if (file.isEmpty()) {
+                 return ResponseEntity.badRequest()
+                         .body(new ApiResponse<>(false, "File is empty", null));
+             }
+
+             // Validate uploads directory
+             Path uploadsPath = Paths.get(uploadDir, folder);
+             if (!Files.exists(uploadsPath) || !Files.isDirectory(uploadsPath)) {
+                 return ResponseEntity.badRequest()
+                         .body(new ApiResponse<>(false, "Uploads directory not accessible", null));
+             }
+
+             // Check if directory is empty
+             boolean isEmpty = Files.list(uploadsPath).findAny().isEmpty();
+             if (isEmpty) {
+                 // ✅ Create test file if empty
+                 String testFileName = "test_" + System.currentTimeMillis() + ".txt";
+                 Path testFilePath = uploadsPath.resolve(testFileName);
+                 Files.createDirectories(testFilePath.getParent());
+                 Files.writeString(testFilePath, "This is a test file created automatically.");
+                 logger.info("Test file created: {}", testFilePath.toString());
+             } else {
+                 // ✅ Directory accessible and has files
+                 logger.info("Uploads directory accessible, existing files present in folder: {}", folder);
+             }
+        	
+         
          // ✅ Validate file size
             if (file.getSize() > 5 * 1024 * 1024) {
                 return ResponseEntity.badRequest()
