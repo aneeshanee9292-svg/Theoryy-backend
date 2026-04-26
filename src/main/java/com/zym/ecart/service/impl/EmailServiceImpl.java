@@ -21,7 +21,7 @@ public class EmailServiceImpl implements EmailService {
     private final JavaMailSender mailSender;
     private final OrderItemRepository orderItemRepository;
 
-    private static final String ADMIN_EMAIL = "udaykumararipaka@gmail.com";
+    private static final String ADMIN_EMAIL = "contact@theoryy.info";
 
     @Value("${spring.mail.username}")
     private String fromEmail;
