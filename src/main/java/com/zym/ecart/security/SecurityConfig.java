@@ -52,6 +52,9 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.DELETE, "/products/**").hasRole("ADMIN")
                         .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/products/**").hasRole("ADMIN")
 
+                        // 🔓 Test S3 connectivity (temporary)
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/files/test-upload").permitAll()
+
                         // 🔐 ADMIN ONLY — Files
                         .requestMatchers("/files/**").hasRole("ADMIN")
 
