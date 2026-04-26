@@ -71,7 +71,14 @@ public class OtpServiceImpl implements OtpService {
         otpExpiry.put(email, System.currentTimeMillis() + OTP_VALIDITY_MS);
 
         // Send OTP email in a background thread (non-blocking)
-        new Thread(() -> sendOtpEmail(email, otp)).start();
+        new Thread(() -> {
+            try {
+                sendOtpEmail(email, otp);
+            } catch (Exception e) {
+                System.err.println("FATAL: OTP email thread crashed for " + email + ": " + e.getMessage());
+                e.printStackTrace();
+            }
+        }).start();
     }
 
     // ─── Verify OTP ───

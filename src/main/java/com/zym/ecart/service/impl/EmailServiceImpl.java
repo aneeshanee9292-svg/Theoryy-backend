@@ -7,6 +7,7 @@ import com.zym.ecart.service.EmailService;
 
 import jakarta.mail.internet.MimeMessage;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
@@ -21,6 +22,9 @@ public class EmailServiceImpl implements EmailService {
     private final OrderItemRepository orderItemRepository;
 
     private static final String ADMIN_EMAIL = "udaykumararipaka@gmail.com";
+
+    @Value("${spring.mail.username}")
+    private String fromEmail;
 
     public EmailServiceImpl(JavaMailSender mailSender,
                             OrderItemRepository orderItemRepository) {
@@ -37,6 +41,7 @@ public class EmailServiceImpl implements EmailService {
 
             MimeMessage mimeMessage = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
+            helper.setFrom(fromEmail);
             helper.setTo(to);
             helper.setSubject("Order Confirmed - #" + order.getId() + " | THEORYY");
             helper.setText(html, true);
@@ -58,8 +63,9 @@ public class EmailServiceImpl implements EmailService {
 
             MimeMessage mimeMessage = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
+            helper.setFrom(fromEmail);
             helper.setTo(ADMIN_EMAIL);
-            helper.setSubject("🛒 New Order #" + order.getId() + " — ₹" + order.getFinalAmount() + " | THEORYY Admin");
+            helper.setSubject("New Order #" + order.getId() + " - Rs." + order.getFinalAmount() + " | THEORYY Admin");
             helper.setText(html, true);
             mailSender.send(mimeMessage);
 
