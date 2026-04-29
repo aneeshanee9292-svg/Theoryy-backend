@@ -103,6 +103,13 @@
 			<artifactId>s3</artifactId>
 		</dependency>
 
+		<!-- Apache POI for Excel report generation (streaming SXSSFWorkbook) -->
+		<dependency>
+			<groupId>org.apache.poi</groupId>
+			<artifactId>poi-ooxml</artifactId>
+			<version>5.2.5</version>
+		</dependency>
+
 	</dependencies>
 
 	<dependencyManagement>
