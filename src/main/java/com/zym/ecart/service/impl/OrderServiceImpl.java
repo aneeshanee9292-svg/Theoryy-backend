@@ -83,7 +83,11 @@ public class OrderServiceImpl implements OrderService {
 
 		double finalAmount = discountService.applyCouponDiscount(request.getCouponCode(), totalAmount - discountAmount);
 
-		// Step 4: Create and save order
+		// Step 4a: Calculate shipping charge (free for orders >= 500)
+		double shippingCharge = finalAmount >= 500 ? 0 : 49;
+		double finalAmountWithShipping = finalAmount + shippingCharge;
+
+		// Step 5: Create and save order
 		Order order = Order.builder()
 				.mobileNumber(request.getMobileNumber())
 				.email(request.getEmail())
@@ -94,7 +98,8 @@ public class OrderServiceImpl implements OrderService {
 				.pincode(request.getPincode())
 				.totalAmount(totalAmount)
 				.discountAmount(discountAmount)
-				.finalAmount(finalAmount)
+				.shippingCharge(shippingCharge)
+				.finalAmount(finalAmountWithShipping)
 				.couponCode(request.getCouponCode())
 				.status(OrderStatus.PAYMENT_PENDING)
 				.createdAt(LocalDateTime.now())
@@ -166,6 +171,7 @@ public class OrderServiceImpl implements OrderService {
 				.pincode(order.getPincode())
 				.totalAmount(order.getTotalAmount())
 				.discountAmount(order.getDiscountAmount())
+				.shippingCharge(order.getShippingCharge())
 				.finalAmount(order.getFinalAmount())
 				.couponCode(order.getCouponCode())
 				.status(order.getStatus().name())

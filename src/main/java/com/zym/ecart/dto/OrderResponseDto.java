@@ -21,6 +21,7 @@ public class OrderResponseDto {
     private Double totalAmount;
     private Double discountAmount;
     private Double finalAmount;
+    private Double shippingCharge;
     private String couponCode;
     private String status;
     private LocalDateTime createdAt;

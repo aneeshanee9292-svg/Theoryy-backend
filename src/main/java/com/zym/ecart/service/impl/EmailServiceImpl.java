@@ -200,6 +200,15 @@ public class EmailServiceImpl implements EmailService {
             html.append("<span>-₹").append(order.getDiscountAmount()).append("</span>");
             html.append("</div>");
         }
+        // Shipping charge
+        html.append("<div style='display:flex; justify-content:space-between; padding:6px 0; font-size:14px;'>");
+        html.append("<span style='color:#888;'>Shipping</span>");
+        if (order.getShippingCharge() != null && order.getShippingCharge() > 0) {
+            html.append("<span>₹").append(order.getShippingCharge()).append("</span>");
+        } else {
+            html.append("<span style='color:#4caf50; font-weight:600;'>Free</span>");
+        }
+        html.append("</div>");
         html.append("<div style='display:flex; justify-content:space-between; padding:12px 0; font-size:20px; font-weight:700; color:#1a1a1a; border-top:2px solid #ddd; margin-top:8px;'>");
         html.append("<span>Total</span>");
         html.append("<span>₹").append(order.getFinalAmount()).append("</span>");
@@ -228,5 +237,146 @@ public class EmailServiceImpl implements EmailService {
             .append("<div class='info-label'>").append(label).append("</div>")
             .append("<div class='info-value'>").append(value != null ? value : "—").append("</div>")
             .append("</div>");
+    }
+
+    @Override
+    @Async
+    public void sendOrderStatusUpdateEmail(String to, Order order, String oldStatus, String newStatus) {
+        try {
+            System.out.println("📧 Sending status update email to: " + to + " | " + oldStatus + " → " + newStatus);
+
+            String statusLabel = newStatus.replace("_", " ");
+            String statusColor = getStatusColor(newStatus);
+            String statusEmoji = getStatusEmoji(newStatus);
+            String statusMessage = getStatusMessage(newStatus);
+
+            StringBuilder html = new StringBuilder();
+            html.append("<!DOCTYPE html>");
+            html.append("<html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>");
+            html.append("<style>");
+            html.append("body { font-family: 'Segoe UI', Arial, sans-serif; background-color:#f8f9fa; margin:0; padding:20px; color:#333; }");
+            html.append(".container { max-width:600px; margin:0 auto; background:#ffffff; border-radius:16px; overflow:hidden; box-shadow:0 8px 30px rgba(0,0,0,0.08); }");
+            html.append(".header { background:linear-gradient(135deg, #1a1a1a, #2d2d2d); color:#fff; text-align:center; padding:35px 30px; }");
+            html.append(".header h1 { margin:0; font-size:24px; font-weight:700; letter-spacing:3px; }");
+            html.append(".header p { margin:10px 0 0; font-size:14px; opacity:0.85; }");
+            html.append(".status-banner { text-align:center; padding:25px; }");
+            html.append(".section { padding:25px 30px; }");
+            html.append(".info-grid { display:table; width:100%; }");
+            html.append(".info-row { display:table-row; }");
+            html.append(".info-label { display:table-cell; padding:6px 0; font-size:13px; color:#888; width:120px; }");
+            html.append(".info-value { display:table-cell; padding:6px 0; font-size:13px; font-weight:600; color:#333; }");
+            html.append(".divider { height:1px; background:#eee; margin:0; }");
+            html.append(".footer { background:#1a1a1a; color:#aaa; text-align:center; padding:25px; font-size:12px; }");
+            html.append("</style></head><body>");
+
+            html.append("<div class='container'>");
+
+            // Logo
+            html.append("<div style='text-align:center; padding:20px 0 0;'>")
+                .append("<img src='https://raw.githubusercontent.com/udayKumar1302/Theory/main/theoryy-logo.png' alt='THEORYY' style='height:50px;'>")
+                .append("</div>");
+
+            // Header
+            html.append("<div class='header'>");
+            html.append("<h1>ORDER STATUS UPDATE</h1>");
+            html.append("<p>Your order #").append(order.getId()).append(" has been updated</p>");
+            html.append("</div>");
+
+            // Status Banner
+            html.append("<div class='status-banner'>");
+            html.append("<div style='font-size:48px; margin-bottom:10px;'>").append(statusEmoji).append("</div>");
+            html.append("<div style='display:inline-block; padding:10px 30px; border-radius:50px; font-size:16px; font-weight:700; letter-spacing:1px; background:")
+                .append(statusColor).append("; color:#fff;'>")
+                .append(statusLabel).append("</div>");
+            html.append("<p style='color:#666; font-size:14px; margin-top:15px;'>").append(statusMessage).append("</p>");
+            html.append("</div>");
+
+            html.append("<div class='divider'></div>");
+
+            // Order Info
+            html.append("<div class='section'>");
+            html.append("<div style='font-size:11px; text-transform:uppercase; letter-spacing:2px; color:#999; font-weight:700; margin-bottom:12px;'>Order Details</div>");
+            html.append("<div class='info-grid'>");
+            addInfoRow(html, "Order ID", "#" + order.getId());
+            addInfoRow(html, "New Status", statusLabel);
+            addInfoRow(html, "Amount", "₹" + order.getFinalAmount());
+            addInfoRow(html, "Date", order.getCreatedAt() != null ? order.getCreatedAt().toString() : "N/A");
+            html.append("</div>");
+            html.append("</div>");
+
+            html.append("<div class='divider'></div>");
+
+            // Customer Info
+            html.append("<div class='section'>");
+            html.append("<div style='font-size:11px; text-transform:uppercase; letter-spacing:2px; color:#999; font-weight:700; margin-bottom:12px;'>Delivery To</div>");
+            html.append("<div class='info-grid'>");
+            addInfoRow(html, "Name", order.getFullName() != null ? order.getFullName() : "N/A");
+            String address = String.join(", ",
+                order.getAddress() != null ? order.getAddress() : "",
+                order.getCity() != null ? order.getCity() : "",
+                order.getState() != null ? order.getState() : "",
+                order.getPincode() != null ? order.getPincode() : ""
+            );
+            addInfoRow(html, "Address", address);
+            html.append("</div>");
+            html.append("</div>");
+
+            // Footer
+            html.append("<div class='footer'>");
+            html.append("If you have any questions, please reach out to us.<br>");
+            html.append("<strong>— Team THEORYY</strong>");
+            html.append("</div>");
+
+            html.append("</div></body></html>");
+
+            MimeMessage mimeMessage = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
+            helper.setFrom(fromEmail);
+            helper.setTo(to);
+            helper.setSubject("Order #" + order.getId() + " Status: " + statusLabel + " | THEORYY");
+            helper.setText(html.toString(), true);
+            mailSender.send(mimeMessage);
+
+            System.out.println("✅ Status update email sent for order: " + order.getId());
+        } catch (Exception e) {
+            System.err.println("❌ Status update email failed for order: " + order.getId());
+            e.printStackTrace();
+        }
+    }
+
+    private String getStatusColor(String status) {
+        switch (status) {
+            case "ORDER_PLACED": return "#4caf50";
+            case "SHIPPED": return "#2196f3";
+            case "DELIVERED": return "#009688";
+            case "PAYMENT_FAILED": return "#f44336";
+            case "CANCELLED": return "#ff5722";
+            case "REFUNDED": return "#ff9800";
+            default: return "#607d8b";
+        }
+    }
+
+    private String getStatusEmoji(String status) {
+        switch (status) {
+            case "ORDER_PLACED": return "✅";
+            case "SHIPPED": return "🚚";
+            case "DELIVERED": return "📦";
+            case "PAYMENT_FAILED": return "❌";
+            case "CANCELLED": return "🚫";
+            case "REFUNDED": return "💰";
+            default: return "📋";
+        }
+    }
+
+    private String getStatusMessage(String status) {
+        switch (status) {
+            case "ORDER_PLACED": return "Your order has been confirmed and is being processed.";
+            case "SHIPPED": return "Great news! Your order has been shipped and is on its way.";
+            case "DELIVERED": return "Your order has been delivered. We hope you love it!";
+            case "PAYMENT_FAILED": return "Unfortunately, your payment could not be processed.";
+            case "CANCELLED": return "Your order has been cancelled as requested.";
+            case "REFUNDED": return "Your refund has been initiated and will reflect shortly.";
+            default: return "Your order status has been updated.";
+        }
     }
 }

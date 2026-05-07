@@ -1,6 +1,7 @@
 package com.zym.ecart.controller;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.springframework.http.ResponseEntity;
@@ -25,6 +26,7 @@ import com.zym.ecart.enums.OrderStatus;
 import com.zym.ecart.repository.CouponRepository;
 import com.zym.ecart.repository.OrderRepository;
 import com.zym.ecart.repository.ProductDiscountRepository;
+import com.zym.ecart.service.EmailService;
 
 @RestController
 @RequestMapping("/admin")
@@ -33,13 +35,16 @@ public class AdminController {
 	private final CouponRepository couponRepository;
 	private final ProductDiscountRepository productDiscountRepository;
 	private final OrderRepository orderRepository;
+	private final EmailService emailService;
 
 	public AdminController(CouponRepository couponRepository,
 						   ProductDiscountRepository productDiscountRepository,
-						   OrderRepository orderRepository) {
+						   OrderRepository orderRepository,
+						   EmailService emailService) {
 		this.couponRepository = couponRepository;
 		this.productDiscountRepository = productDiscountRepository;
 		this.orderRepository = orderRepository;
+		this.emailService = emailService;
 	}
 
 	// ──────────────── ORDER MANAGEMENT ENDPOINTS ────────────────
@@ -60,10 +65,55 @@ public class AdminController {
 	@PatchMapping("/orders/{id}/status")
 	public ResponseEntity<?> updateOrderStatus(@PathVariable Long id, @RequestParam String status) {
 		return orderRepository.findById(id).map(order -> {
+			String oldStatus = order.getStatus() != null ? order.getStatus().name() : "UNKNOWN";
 			order.setStatus(OrderStatus.valueOf(status));
 			orderRepository.save(order);
+
+			// Send status update email to customer
+			if (order.getEmail() != null && !oldStatus.equals(status)) {
+				emailService.sendOrderStatusUpdateEmail(order.getEmail(), order, oldStatus, status);
+			}
+
 			return ResponseEntity.ok(toOrderResponseDto(order));
 		}).orElse(ResponseEntity.notFound().build());
+	}
+
+	/**
+	 * Bulk status update for multiple orders at once.
+	 * Request body: { "orderIds": [1,2,3], "status": "SHIPPED" }
+	 */
+	@PostMapping("/orders/bulk-status")
+	public ResponseEntity<?> bulkUpdateOrderStatus(@RequestBody Map<String, Object> request) {
+		@SuppressWarnings("unchecked")
+		List<Integer> orderIds = (List<Integer>) request.get("orderIds");
+		String newStatus = (String) request.get("status");
+
+		if (orderIds == null || orderIds.isEmpty() || newStatus == null) {
+			return ResponseEntity.badRequest().body(Map.of("error", "orderIds and status are required"));
+		}
+
+		int updatedCount = 0;
+		for (Integer orderId : orderIds) {
+			orderRepository.findById(orderId.longValue()).ifPresent(order -> {
+				String oldStatus = order.getStatus() != null ? order.getStatus().name() : "UNKNOWN";
+				if (!oldStatus.equals(newStatus)) {
+					order.setStatus(OrderStatus.valueOf(newStatus));
+					orderRepository.save(order);
+
+					// Send status update email to customer
+					if (order.getEmail() != null) {
+						emailService.sendOrderStatusUpdateEmail(order.getEmail(), order, oldStatus, newStatus);
+					}
+				}
+			});
+			updatedCount++;
+		}
+
+		return ResponseEntity.ok(Map.of(
+			"status", "success",
+			"message", updatedCount + " orders updated to " + newStatus,
+			"updatedCount", updatedCount
+		));
 	}
 
 	private OrderResponseDto toOrderResponseDto(Order order) {
@@ -97,6 +147,7 @@ public class AdminController {
 				.pincode(order.getPincode())
 				.totalAmount(order.getTotalAmount())
 				.discountAmount(order.getDiscountAmount())
+				.shippingCharge(order.getShippingCharge())
 				.finalAmount(order.getFinalAmount())
 				.couponCode(order.getCouponCode())
 				.status(order.getStatus() != null ? order.getStatus().name() : null)

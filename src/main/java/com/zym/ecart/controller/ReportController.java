@@ -93,4 +93,42 @@ public class ReportController {
                 "reportDate", today.toString()
         ));
     }
+
+    // ──────────────── DAILY MAIL TOGGLE ────────────────
+
+    /**
+     * Get the current status of the daily mail toggle.
+     *
+     * GET /admin/reports/daily-mail/status
+     */
+    @GetMapping("/daily-mail/status")
+    public ResponseEntity<Map<String, Object>> getDailyMailStatus() {
+        boolean enabled = reportScheduler.isDailyMailEnabled();
+        return ResponseEntity.ok(Map.of(
+                "enabled", enabled,
+                "message", "Daily mail is " + (enabled ? "ENABLED" : "DISABLED")
+        ));
+    }
+
+    /**
+     * Toggle the daily mail on/off.
+     *
+     * POST /admin/reports/daily-mail/toggle
+     * Body: { "enabled": true } or { "enabled": false }
+     */
+    @PostMapping("/daily-mail/toggle")
+    public ResponseEntity<Map<String, Object>> toggleDailyMail(@RequestBody Map<String, Boolean> request) {
+        Boolean enabled = request.get("enabled");
+        if (enabled == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "enabled field is required"));
+        }
+
+        reportScheduler.setDailyMailEnabled(enabled);
+
+        return ResponseEntity.ok(Map.of(
+                "status", "success",
+                "enabled", enabled,
+                "message", "Daily mail " + (enabled ? "ENABLED" : "DISABLED") + " successfully"
+        ));
+    }
 }

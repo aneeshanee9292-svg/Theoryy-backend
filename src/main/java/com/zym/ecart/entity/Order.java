@@ -37,6 +37,8 @@ public class Order {
 
     private Double finalAmount;
 
+    private Double shippingCharge;
+
     // 🔥 FIX: Prevent infinite recursion (parent side)
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JsonManagedReference

@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Scheduler that triggers the daily order report at 00:10 IST.
@@ -34,6 +35,12 @@ public class DailyOrderReportScheduler {
 
     private final DailyOrderReportService reportService;
 
+    /**
+     * Toggle to enable/disable the daily cron mail.
+     * Default is enabled (true). Admin can toggle via API.
+     */
+    private final AtomicBoolean dailyMailEnabled = new AtomicBoolean(true);
+
     public DailyOrderReportScheduler(DailyOrderReportService reportService) {
         this.reportService = reportService;
     }
@@ -48,6 +55,11 @@ public class DailyOrderReportScheduler {
      */
     @Scheduled(cron = "0 10 0 * * *", zone = "Asia/Kolkata")
     public void runDailyReport() {
+        if (!dailyMailEnabled.get()) {
+            log.info("⏸️ Daily mail is DISABLED. Skipping report.");
+            return;
+        }
+
         LocalDate yesterday = LocalDate.now(IST).minusDays(1);
 
         log.info("⏰ Daily order report scheduler triggered. Reporting for IST date: {}", yesterday);
@@ -76,5 +88,20 @@ public class DailyOrderReportScheduler {
             log.error("❌ Manual report FAILED for IST date {}: {}", istDate, e.getMessage(), e);
             throw new RuntimeException("Report generation failed: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * Check if daily mail is enabled.
+     */
+    public boolean isDailyMailEnabled() {
+        return dailyMailEnabled.get();
+    }
+
+    /**
+     * Enable or disable the daily mail.
+     */
+    public void setDailyMailEnabled(boolean enabled) {
+        dailyMailEnabled.set(enabled);
+        log.info("📧 Daily mail {} by admin", enabled ? "ENABLED" : "DISABLED");
     }
 }
